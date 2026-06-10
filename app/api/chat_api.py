@@ -1,5 +1,3 @@
-import os
-import json
 from typing import Optional
 from fastapi import APIRouter, Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,16 +34,13 @@ async def get_user_history(
     user_id: str = Path(..., description="The unique identifier of the user"),
     db: AsyncSession = Depends(get_db),
     session_id: Optional[str] = None,
-    limit: int = 20,
-    offset: int = 0
 ):
     """Retrieves the full conversational history and evaluation audits for a user."""
     memory_store = SQLAlchemyMemoryStore(db)
-    history = await memory_store.get_conversation_history(user_id=user_id, limit=limit, offset=offset, session_id=session_id)
+    history = await memory_store.get_conversation_history(user_id=user_id, session_id=session_id)
     return UserHistoryResponse(
         user_id=user_id,
-        history=history["data"],
-        pagination=history["pagination"]
+        history=history,
     )
 
 @router.delete("/{user_id}/memory")

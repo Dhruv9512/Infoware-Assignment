@@ -13,75 +13,69 @@ logger = get_logger(__name__)
 
 class SalesAgentGraph:
     """
-    Encapsulated graph execution class. 
-    Manages the state machine, LLM dynamic initialization, and routing logic 
+    Encapsulated graph execution class.
+    Manages the state machine, LLM dynamic initialization, and routing logic
     safely across concurrent asynchronous web requests.
     """
 
     def __init__(self):
-        # Initialize the LLM and bind our tools the moment the class is instantiated
         self.llm = LLMFactory.get_tool_calling_llm(all_platform_tools)
-        # Build and compile the execution graph
         self.executor = self._build_graph()
 
+    # -------------------------------------------------------------------------
+    # Nodes
+    # -------------------------------------------------------------------------
+
     def _call_model(self, state: AgentState):
-        """The primary reasoning node where the LLM decides what to do next."""
+        """Primary reasoning node — LLM decides the next action."""
         messages = state.get("messages", [])
-        
-        # If this is the very first message in the loop, inject the system prompt
-        if len(messages) > 0 and not isinstance(messages[0], SystemMessage):
+
+        if messages and not isinstance(messages[0], SystemMessage):
             system_msg = SystemMessage(
-                content=SALES_AGENT_SYSTEM_PROMPT.format(
-                    user_id=state["user_id"] # Removed session_id here!
-                )
+                content=SALES_AGENT_SYSTEM_PROMPT.format(user_id=state["user_id"])
             )
             messages = [system_msg] + messages
 
-        # Invoke the LLM
         response = self.llm.invoke(messages)
 
-        # Track tools if the LLM decided to call any during this specific turn
-        tools_called_this_turn = state.get("tools_called", [])
-        if hasattr(response, 'tool_calls') and response.tool_calls:
-            for tool_call in response.tool_calls:
-                tools_called_this_turn.append(tool_call["name"])
+        tools_called = state.get("tools_called", [])
+        if hasattr(response, "tool_calls") and response.tool_calls:
+            tools_called = tools_called + [tc["name"] for tc in response.tool_calls]
 
-        return {"messages": [response], "tools_called": tools_called_this_turn}
+        return {"messages": [response], "tools_called": tools_called}
+
+    # -------------------------------------------------------------------------
+    # Edges
+    # -------------------------------------------------------------------------
 
     def _should_continue(self, state: AgentState):
-        """Edge condition: Determines if the LLM called a tool or is finished answering."""
+        """Routes to tools if the LLM issued a tool call, otherwise ends."""
         last_message = state["messages"][-1]
-        
-        if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             return "tools"
         return END
+
+    # -------------------------------------------------------------------------
+    # Graph
+    # -------------------------------------------------------------------------
 
     def _build_graph(self):
         """Constructs, connects, and compiles the StateGraph workflow."""
         workflow = StateGraph(AgentState)
 
-        # Add our encapsulated class methods as the nodes
         workflow.add_node("agent", self._call_model)
         workflow.add_node("tools", ToolNode(all_platform_tools))
 
-        # Graph eges
         workflow.set_entry_point("agent")
-        workflow.add_conditional_edges(
-            "agent",
-            self._should_continue,
-            {
-                "tools": "tools",
-                END: END
-            }
-        )
+        workflow.add_conditional_edges("agent", self._should_continue, {"tools": "tools", END: END})
         workflow.add_edge("tools", "agent")
 
-        # Compile and return the executable application
         return workflow.compile()
 
+    # -------------------------------------------------------------------------
+    # Public API
+    # -------------------------------------------------------------------------
+
     async def ainvoke(self, state: dict, config: dict = None):
-        """
-        Public execution method. Exposes the async invoke of the compiled graph 
-        so external services can interact with it cleanly.
-        """
+        """Exposes async graph invocation to external services."""
         return await self.executor.ainvoke(state, config)

@@ -95,16 +95,12 @@ class MessageHistoryItem(BaseModel):
     eval_reasoning: Optional[str] = None
 
 
-class PaginationMeta(BaseModel):
-    total: int
-    limit: int
-    offset: int
-    has_more: bool
 
 class UserHistoryResponse(BaseModel):
+    """The complete response wrapper returning cross-session history log structures."""
     user_id: str
-    history: List[Dict[str, Any]]
-    pagination: PaginationMeta
+    history: List[MessageHistoryItem] = Field(default_factory=list)
+
 
 # ==========================================
 # 4. CATALOG SCHEMAS

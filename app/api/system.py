@@ -1,6 +1,8 @@
+from http.client import HTTPException
 import json
 import os
 from fastapi import APIRouter
+from app.models.schemas import CatalogResponse
 from app.core.config import get_settings
 
 router = APIRouter()
@@ -17,19 +19,16 @@ async def health_check():
     }
 
 
-@router.get("/catalog")
+@router.get("/catalog", response_model=CatalogResponse)
 async def get_catalog():
-    """
-    Returns the raw product/pricing catalog the agent uses to ground its answers.
-    Uses the working directory path to guarantee resolution.
-    """
-    # Looks for catalog.json directly in the folder where uvicorn was started
+    """Returns the product/pricing catalog the agent uses to ground its answers."""
     catalog_path = os.path.abspath(os.path.join(os.getcwd(), "catalog.json"))
-    
-    if os.path.exists(catalog_path):
-        with open(catalog_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-            
-    return {
-        "error": f"System fault: catalog.json is missing. Evaluated path: {catalog_path}"
-    }
+
+    if not os.path.exists(catalog_path):
+        raise HTTPException(
+            status_code=404,
+            detail=f"catalog.json not found at: {catalog_path}"
+        )
+
+    with open(catalog_path, "r", encoding="utf-8") as f:
+        return CatalogResponse(**json.load(f))
