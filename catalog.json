@@ -1,14 +1,41 @@
 {
   "plans": [
     {
+      "name": "Developer",
+      "price": "$0/mo",
+      "features": [
+        "1 user",
+        "Sandbox API access (1,000 req/mo)",
+        "Community forum support",
+        "100MB storage",
+        "Basic templates"
+      ]
+    },
+    {
       "name": "Starter",
       "price": "$49/mo",
       "features": [
         "5 users",
-        "API access",
+        "Production API access (10,000 req/mo)",
         "email support",
         "1GB storage",
-        "Basic analytics"
+        "Basic analytics",
+        "Standard templates",
+        "Daily automated backups"
+      ]
+    },
+    {
+      "name": "Professional",
+      "price": "$99/mo",
+      "features": [
+        "10 users",
+        "Production API access (50,000 req/mo)",
+        "Email and live chat support",
+        "5GB storage",
+        "Standard analytics and dashboards",
+        "Role-based access control (RBAC)",
+        "Remove platform branding",
+        "Custom domain mapping"
       ]
     },
     {
@@ -16,12 +43,14 @@
       "price": "$199/mo",
       "features": [
         "25 users",
-        "webhooks",
+        "webhooks (up to 15 endpoints)",
         "priority support",
         "10GB storage",
-        "Advanced analytics",
+        "Advanced analytics and custom reporting",
         "Custom integrations",
-        "Slack support"
+        "Slack and Microsoft Teams support",
+        "Data export (CSV/JSON)",
+        "A/B testing tools"
       ]
     },
     {
@@ -29,14 +58,16 @@
       "price": "$499/mo",
       "features": [
         "unlimited users",
-        "SSO",
+        "SSO (SAML, Okta, Azure AD)",
         "audit logs",
         "SLA",
         "Unlimited storage",
         "Dedicated account manager",
-        "Custom contracts",
+        "Custom contracts and invoicing",
         "On-premise deployment option",
-        "99.99% uptime guarantee"
+        "99.99% uptime guarantee",
+        "HIPAA and SOC2 compliance",
+        "White-labeling support"
       ]
     }
   ]
