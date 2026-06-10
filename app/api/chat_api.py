@@ -62,7 +62,7 @@ async def get_user_evals(
 ):
     """Bonus Endpoint: Aggregates evaluation metrics across all sessions for a user."""
     memory_store = SQLAlchemyMemoryStore(db)
-    history = await memory_store.get_conversation_history(user_id=user_id, limit=1000)
+    history = await memory_store.get_conversation_history(user_id=user_id)
 
     # Filter for AI responses that include evaluation scores
     eval_msgs = [msg for msg in history["data"] if msg["role"] == "assistant" and msg.get("groundedness") is not None]
