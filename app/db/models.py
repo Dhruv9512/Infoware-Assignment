@@ -5,31 +5,25 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
 
+def get_utc_now_naive():
+    """Strips the timezone info to match PostgreSQL TIMESTAMP WITHOUT TIME ZONE"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class UserMemorySummaryTable(Base):
-    """
-    Stores long-term aggregated facts and summaries about a specific user.
-    This acts as the persistent cross-session profile storage.
-    """
     __tablename__ = "user_memory_summaries"
 
     user_id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
     summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        DateTime, 
+        default=get_utc_now_naive, 
+        onupdate=get_utc_now_naive, 
         nullable=False
     )
 
     messages = relationship("MessageTable", back_populates="user", cascade="all, delete-orphan")
 
-
 class MessageTable(Base):
-    """
-    Stores the absolute granular, turn-by-turn conversation logs.
-    Tracks sessions, actual text, tools invoked, and structural self-evaluation scores.
-    """
     __tablename__ = "messages"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -48,8 +42,8 @@ class MessageTable(Base):
     eval_reasoning: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        DateTime, # Removed timezone=True
+        default=get_utc_now_naive, # Uses the new naive function
         nullable=False
     )
 
