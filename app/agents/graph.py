@@ -2,7 +2,7 @@ from langchain_core.messages import SystemMessage
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 
-from app.core.get_llm import get_llm
+from app.core.get_llm import LLMFactory
 from app.core.logging import get_logger
 from app.agents.state import AgentState
 from app.prompt.prompts import SALES_AGENT_SYSTEM_PROMPT
@@ -20,7 +20,7 @@ class SalesAgentGraph:
 
     def __init__(self):
         # Initialize the LLM and bind our tools the moment the class is instantiated
-        self.llm = get_llm().bind_tools(all_platform_tools)
+        self.llm = LLMFactory.get_tool_calling_llm(all_platform_tools)
         # Build and compile the execution graph
         self.executor = self._build_graph()
 
@@ -39,7 +39,7 @@ class SalesAgentGraph:
 
         # Invoke the LLM
         response = self.llm.invoke(messages)
-        
+
         # Track tools if the LLM decided to call any during this specific turn
         tools_called_this_turn = state.get("tools_called", [])
         if hasattr(response, 'tool_calls') and response.tool_calls:

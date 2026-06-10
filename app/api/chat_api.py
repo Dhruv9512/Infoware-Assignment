@@ -1,3 +1,6 @@
+import os
+import json
+from typing import Optional
 from fastapi import APIRouter, Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,11 +12,13 @@ from app.models.schemas import (
     PerformanceMetricsResponse
 )
 from app.services.chat_service import build_chat_service
+from app.core.config import get_settings
 from app.memory.sqlite_backend import SQLAlchemyMemoryStore
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
+settings = get_settings()
 
 
 @router.post("/{user_id}", response_model=ChatResponse)
@@ -29,13 +34,19 @@ async def chat_with_agent(
 @router.get("/{user_id}/history", response_model=UserHistoryResponse)
 async def get_user_history(
     user_id: str = Path(..., description="The unique identifier of the user"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    session_id: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0
 ):
     """Retrieves the full conversational history and evaluation audits for a user."""
     memory_store = SQLAlchemyMemoryStore(db)
-    history = await memory_store.get_conversation_history(user_id, limit=100)
-    return UserHistoryResponse(user_id=user_id, history=history)
-
+    history = await memory_store.get_conversation_history(user_id=user_id, limit=limit, offset=offset, session_id=session_id)
+    return UserHistoryResponse(
+        user_id=user_id,
+        history=history["data"],
+        pagination=history["pagination"]
+    )
 
 @router.delete("/{user_id}/memory")
 async def clear_user_memory(
@@ -56,10 +67,10 @@ async def get_user_evals(
 ):
     """Bonus Endpoint: Aggregates evaluation metrics across all sessions for a user."""
     memory_store = SQLAlchemyMemoryStore(db)
-    history = await memory_store.get_conversation_history(user_id, limit=1000)
+    history = await memory_store.get_conversation_history(user_id=user_id, limit=1000)
 
     # Filter for AI responses that include evaluation scores
-    eval_msgs = [msg for msg in history if msg["role"] == "assistant" and msg.get("groundedness") is not None]
+    eval_msgs = [msg for msg in history["data"] if msg["role"] == "assistant" and msg.get("groundedness") is not None]
 
     if not eval_msgs:
         return PerformanceMetricsResponse(
@@ -82,3 +93,4 @@ async def get_user_evals(
         average_confidence=round(avg_c, 2),
         total_flagged_escalations=flagged
     )
+

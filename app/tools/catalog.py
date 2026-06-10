@@ -24,9 +24,10 @@ except Exception as e:
 @tool
 def search_catalog(query: str) -> str:
     """
-    Search over the SaaS product and pricing catalog JSON data.
-    Use this tool whenever the user asks about plans, features, costs, pricing, or tier limits.
-    
+    Semantic or keyword search over the product catalog JSON.
+    CRITICAL INSTRUCTION: Pass a single, simple keyword (like 'Enterprise' or 'pricing'). 
+    Do NOT call this tool multiple times for the same concept. One query is enough to find the data.
+
     Args:
         query: The keyword or feature string to search for (e.g., 'SSO', 'storage', 'pricing').
     """

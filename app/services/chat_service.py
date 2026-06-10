@@ -2,9 +2,8 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.messages import HumanMessage, AIMessage
 
-from app.core.get_llm import get_llm
+from app.core.get_llm import LLMFactory
 from app.core.logging import get_logger
-from app.core.get_llm import get_llm
 from app.models.schemas import ChatRequest, ChatResponse
 from app.memory.sqlite_backend import SQLAlchemyMemoryStore
 from app.prompt.prompts import SUMMARTY_COMPRESSION_PROMPT
@@ -23,7 +22,7 @@ class ChatService:
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
         self.memory_store = SQLAlchemyMemoryStore(db_session)
-        self.llm_runner = get_llm()
+        self.llm_runner = LLMFactory.get_llm()
         
     async def _update_user_long_term_summary(self, user_id: str, new_user_msg: str, new_agent_reply: str) -> None:
         """
@@ -81,8 +80,24 @@ class ChatService:
         result_state = await sales_agent_graph.ainvoke(state_input)
         
         # Extract the final artifacts from the graph state
-        final_message_text = result_state["messages"][-1].content
+        raw_content = result_state["messages"][-1].content
+        
+        # Flatten multi-modal lists into standard strings for the API response
+        if isinstance(raw_content, list):
+            extracted_text = []
+            for block in raw_content:
+                if isinstance(block, dict) and "text" in block:
+                    extracted_text.append(block["text"])
+                elif isinstance(block, str):
+                    extracted_text.append(block)
+            final_message_text = " ".join(extracted_text) if extracted_text else str(raw_content)
+        else:
+            final_message_text = str(raw_content)
+            
         tools_invoked = result_state.get("tools_called", [])
+        
+        # Remove duplicate tool calls
+        tools_invoked = list(dict.fromkeys(tools_invoked))
 
         # 4. Run the strict LLM Self-Evaluation Block
         eval_block = await build_eval_service(

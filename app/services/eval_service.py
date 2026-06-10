@@ -1,5 +1,5 @@
 from langchain_core.prompts import ChatPromptTemplate
-from app.core.get_llm import get_llm
+from app.core.get_llm import LLMFactory
 from app.core.logging import get_logger
 from app.models.schemas import FeedbackLoopBlock
 # Import the newly separated prompt templates
@@ -15,7 +15,7 @@ class EvaluationService:
     """
     
     def __init__(self):
-        self.llm = get_llm().with_structured_output(FeedbackLoopBlock)
+        self.llm = LLMFactory.build_structured_eval_llm()
         self.prompt = self._build_prompt()
         self.chain = self.prompt | self.llm
 
