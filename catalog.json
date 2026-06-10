@@ -1,0 +1,43 @@
+{
+  "plans": [
+    {
+      "name": "Starter",
+      "price": "$49/mo",
+      "features": [
+        "5 users",
+        "API access",
+        "email support",
+        "1GB storage",
+        "Basic analytics"
+      ]
+    },
+    {
+      "name": "Growth",
+      "price": "$199/mo",
+      "features": [
+        "25 users",
+        "webhooks",
+        "priority support",
+        "10GB storage",
+        "Advanced analytics",
+        "Custom integrations",
+        "Slack support"
+      ]
+    },
+    {
+      "name": "Enterprise",
+      "price": "$499/mo",
+      "features": [
+        "unlimited users",
+        "SSO",
+        "audit logs",
+        "SLA",
+        "Unlimited storage",
+        "Dedicated account manager",
+        "Custom contracts",
+        "On-premise deployment option",
+        "99.99% uptime guarantee"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+# --- Web & API Framework ---
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+
+# --- Data Validation & Configuration ---
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.1
+
+# --- Database & Persistence ---
+sqlalchemy[asyncio]>=2.0.0
+aiosqlite>=0.20.0
+asyncpg>=0.29.0  # Required if you deploy to Postgres on Railway/AWS
+
+# --- AI Orchestration & Agents ---
+langchain>=0.2.0
+langchain-core>=0.2.0
+langgraph>=0.0.30
+
+# --- LLM Provider Integrations (LangChain Wrappers) ---
+langchain-groq>=0.1.0
+langchain-google-genai>=1.0.0
+langchain-huggingface>=0.0.3
+
+# --- Observability & Utilities ---
+structlog>=24.1.0
