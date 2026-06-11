@@ -1,0 +1,166 @@
+---
+
+```markdown
+# CloudFlow AI Sales Agent
+
+A Persistent Sales Assistant Agent featuring cross-session memory, dynamic tool calling, and structural LLM self-evaluations.
+
+## 1. Live Application URL
+**Railway Production URL:** https://infoware-assignment-production.up.railway.app
+
+**Demo Video Link Here:** https://www.loom.com/share/c8f8a1efbf444deba9a0caae595b09bb
+
+---
+
+## 2. Architecture Diagram
+Below is the request lifecycle illustrating how a user message flows from the API through the LangGraph agent, tool execution, and the evaluation layer.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as FastAPI Router
+    participant Agent as LangGraph Sales Agent
+    participant Tools as Tools (Catalog/Memory)
+    participant Eval as Evaluation Service
+    participant DB as SQLite / Persistence
+
+    Client->>API: POST /chat/{user_id}
+    API->>DB: Fetch past conversation & user summary
+    API->>Agent: Invoke with History + New Message
+    loop Agent Reasoning
+        Agent->>Tools: Call search_catalog or get_user_memory
+        Tools-->>Agent: Return tool execution results
+    Agent->>Agent: Generate final response
+    end
+    Agent-->>API: Return Markdown Response
+    API->>Eval: Trigger structured self-eval (temp=0.0)
+    Eval-->>API: Return FeedbackLoopBlock (scores)
+    API->>DB: (Background) Persist turn & compress summary
+    API-->>Client: Return JSON (Response + Eval + Tools)
+
+```
+
+---
+
+## 3. Memory Design Decisions
+
+**Why memory is stored this way:**
+The memory layer is isolated behind an abstract repository pattern (`BaseMemoryStore`). This ensures the AI orchestration logic is entirely decoupled from the database technology. Currently, it uses `SQLAlchemyMemoryStore` backed by asynchronous SQLite (`aiosqlite`).
+
+Instead of injecting the entire raw message history into the LLM context window (which breaks at scale), the system uses a dual-memory approach:
+
+1. **Short-Term Context:** Turn-by-turn history is fetched based on the active `session_id`.
+2. **Long-Term Compressed Memory:** A background task runs an independent LLM prompt to compress user facts (e.g., budget, team size, interests) into a dense summary string. This summary is retrieved via the `get_user_memory` tool to maintain cross-session continuity without token bloat.
+
+**What to use at scale:**
+Because of the abstraction, moving to a distributed database like PostgreSQL is simply a matter of swapping the `DATABASE_URL` in the `.env` file to use `asyncpg`. However, for true enterprise scale with millions of conversational turns, I would replace the text-based summary approach with a **Vector Database** (e.g., Milvus, Pinecone) or a dedicated memory layer like **Mem0**. This allows for semantic similarity search over historical contexts rather than relying on a continuously appended text summary.
+
+---
+
+## 4. Evaluation Design
+
+**How self-scoring is implemented:**
+Every agent response is graded by an encapsulated `EvaluationService` before returning to the user. This service uses LangChain's `with_structured_output` to map the LLM's judgment directly into a strongly-typed `FeedbackLoopBlock` Pydantic model. The evaluation LLM is strictly pinned to `temperature=0.0` to ensure deterministic, consistent scoring of *Groundedness*, *Relevance*, and *Confidence* on a 0.0 to 1.0 scale. If Groundedness or Confidence drops below 0.7, the system automatically sets a `flagged: true` Boolean for human review.
+
+**Limitations:**
+Using a foundational LLM as a judge synchronously blocks the API response, increasing user-facing latency. Furthermore, foundational LLMs are susceptible to "self-sycophancy," where they inherently grade their own outputs higher than an independent model would.
+
+**What to replace it with:**
+In a production environment, I would replace this synchronous step with an asynchronous event-driven architecture (e.g., publishing the response to a Kafka/RabbitMQ topic). A specialized, lightweight evaluation model (such as a fine-tuned small language model, Ragas, or Patronus AI) would consume these events in the background, grading the responses and updating the database without making the user wait.
+
+---
+
+## 5. Cross-Session Memory Demonstration (Curl Commands)
+
+These two sequential calls prove the agent remembers context from completely different sessions.
+
+**Call 1: Establishing context in a new session (Sets Budget)**
+
+```bash
+curl -X POST "[https://infoware-assignment-production.up.railway.app/chat/tester_999](https://infoware-assignment-production.up.railway.app/chat/tester_999)" \
+-H "Content-Type: application/json" \
+-d '{"message": "Hi, I am looking for a plan for my team of 20 people. My maximum budget is $200/mo."}'
+
+```
+
+**Call 2: Utilizing context in a completely separate session**
+*(Notice we do not pass `session_id` or mention our budget/team size again).*
+
+```bash
+curl -X POST "[https://infoware-assignment-production.up.railway.app/chat/tester_999](https://infoware-assignment-production.up.railway.app/chat/tester_999)" \
+-H "Content-Type: application/json" \
+-d '{"message": "Based on our previous conversation, which plan fits my needs best?"}'
+
+```
+
+*The agent will successfully invoke `get_user_memory` and recommend the Growth plan ($199/mo) based on the 20-person team size and $200 budget established in Call 1.*
+
+---
+
+## 6. How `session_id` Works Across the API
+
+The `session_id` acts as the boundary for immediate context windows. The API gracefully handles it whether the client provides it or not.
+
+* **In Requests (`POST /chat/{user_id}`):** The `session_id` is an `Optional[str]` in the request payload.
+* **If Omitted:** The backend automatically generates a fresh UUID (`uuid.uuid4()`) and starts a brand new conversational thread. (Note: *Cross-session memory* is still injected via the background summary, so the agent remembers the user, just not the immediate previous message thread).
+* **If Provided:** The system fetches the exact turn-by-turn history linked to that session UUID, allowing the user to seamlessly continue an existing conversation.
+
+
+* **In History (`GET /chat/{user_id}/history`):** You can optionally pass `?session_id=<uuid>` as a query parameter.
+* **If Provided:** Returns only the chat logs belonging to that specific session.
+* **If Omitted:** Returns the master log of *all* messages across *every* session ever created by the user.
+
+
+
+---
+
+## 7. Identity Management: How `user_id` Works Across the API
+
+Because this assignment does not include an overarching authentication system (e.g., JWT, OAuth), identity management is designed to be completely frictionless for testing and review.
+
+* **Implicit User Creation (No Signup):** There is no "create user" endpoint. The `user_id` is passed directly as a path parameter in the API routes (e.g., `POST /chat/{user_id}`).
+* **Automatic Provisioning:** When a request is made with a `user_id` that the database has never seen before, the backend's memory layer automatically detects this and initializes a new, blank memory profile for that user on the fly before saving the message.
+* **Flexible Identification:** You can use any string to establish a new user (e.g., `reviewer_1`, `john_doe`, `test_account`). The agent will treat each unique string as a completely separate identity with its own isolated cross-session memory.
+* **Hard Resets:** Calling the `DELETE /chat/{user_id}/memory` endpoint drops all historical records and long-term summaries associated with that string. The very next call with that same `user_id` will be treated as a brand-new user interacting with the system for the first time.
+
+---
+
+## 8. API Endpoint Documentation
+
+### Core Chat
+
+* `POST /chat/{user_id}`
+* **Description:** Sends a message to the AI agent. Returns the markdown response, the tools the agent invoked, and the self-evaluation grading block.
+* **Body:** `{"message": "string", "session_id": "optional_string"}`
+
+
+
+### Memory & History
+
+* `GET /chat/{user_id}/history`
+* **Description:** Retrieves the user's historical conversational data. Returns the total count of messages, the LLM-generated long-term profile summary, and the raw message arrays.
+
+
+* `DELETE /chat/{user_id}/memory`
+* **Description:** GDPR-compliance endpoint. Hard deletes all historical message turns and profile summaries associated with the user.
+
+
+
+### Analytics & System
+
+* `GET /chat/{user_id}/evals`
+* **Description:** Bonus implementation. Aggregates evaluation data across all sessions for a user, returning averages for groundedness, relevance, confidence, and total escalation flags.
+
+
+* `GET /catalog`
+* **Description:** Returns the raw JSON `catalog.json` structure used to ground the agent.
+
+
+* `GET /health`
+* **Description:** Standard infrastructure check returning service status, the active environment, and the active LLM provider.
+
+
+
+```
+
+```
