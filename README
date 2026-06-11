@@ -1,6 +1,3 @@
----
-
-```markdown
 # CloudFlow AI Sales Agent
 
 A Persistent Sales Assistant Agent featuring cross-session memory, dynamic tool calling, and structural LLM self-evaluations.
