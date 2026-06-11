@@ -82,24 +82,24 @@ class ChatResponse(BaseModel):
 class MessageHistoryItem(BaseModel):
     """Granular data layout detailing a historical interaction trace."""
     id: str
-    role: str = Field(..., description="The contextual author of the payload: 'user' or 'assistant'.")
-    content: str
+    user_message: str
+    agent_message: str
     tools_called: List[str]
     created_at: datetime
     
-    # Optional sub-elements representing historical evaluation logs
+    # Evaluation logs
     groundedness: Optional[float] = None
     relevance: Optional[float] = None
     confidence: Optional[float] = None
     flagged: bool = False
     eval_reasoning: Optional[str] = None
 
-
-
 class UserHistoryResponse(BaseModel):
     """The complete response wrapper returning cross-session history log structures."""
     user_id: str
-    history: List[MessageHistoryItem] = Field(default_factory=list)
+    total_count: int = Field(..., description="Total number of conversational turns.")
+    summary: str = Field(..., description="The compressed profile facts for the user.")
+    data: List[MessageHistoryItem] = Field(default_factory=list)
 
 
 # ==========================================

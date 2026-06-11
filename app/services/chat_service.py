@@ -34,18 +34,8 @@ async def _background_persist_and_summarize(
             await memory_store.save_message_turn(
                 user_id=user_id,
                 session_id=session_id,
-                role="user",
-                content=user_message,
-                tools_called=[],
-                catalog_context="",
-                evaluation={},
-            )
-
-            await memory_store.save_message_turn(
-                user_id=user_id,
-                session_id=session_id,
-                role="assistant",
-                content=final_message_text,
+                user_message=user_message,
+                agent_message=final_message_text,
                 tools_called=tools_invoked,
                 catalog_context="",
                 evaluation=eval_block.model_dump(),
@@ -77,11 +67,16 @@ class ChatService:
         logger.info("processing_chat_turn", user_id=user_id, session_id=session_id)
 
         # ── 1. Hydrate message history ────────────────────────────────────────
-        history = await self.memory_store.get_conversation_history(user_id)
-        messages = [
-            HumanMessage(content=r["content"]) if r["role"] == "user" else AIMessage(content=r["content"])
-            for r in history
-        ]
+        history = await self.memory_store.get_conversation_history(
+            user_id=user_id, 
+            session_id=session_id
+        )
+        
+        messages = []
+        for r in history:
+            messages.append(HumanMessage(content=r["user_message"]))
+            messages.append(AIMessage(content=r["agent_message"]))
+
         messages.append(HumanMessage(content=request.message))
 
         # ── 2. Run the agent ──────────────────────────────────────────────────

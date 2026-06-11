@@ -37,10 +37,15 @@ async def get_user_history(
 ):
     """Retrieves the full conversational history and evaluation audits for a user."""
     memory_store = SQLAlchemyMemoryStore(db)
+    
     history = await memory_store.get_conversation_history(user_id=user_id, session_id=session_id)
+    summary = await memory_store.get_user_summary(user_id) or "No prior facts established."
+    
     return UserHistoryResponse(
         user_id=user_id,
-        history=history,
+        total_count=len(history),
+        summary=summary,
+        data=history,
     )
 
 @router.delete("/{user_id}/memory")
@@ -62,10 +67,9 @@ async def get_user_evals(
 ):
     """Bonus Endpoint: Aggregates evaluation metrics across all sessions for a user."""
     memory_store = SQLAlchemyMemoryStore(db)
+   
     history = await memory_store.get_conversation_history(user_id=user_id)
-
-    # Filter for AI responses that include evaluation scores
-    eval_msgs = [msg for msg in history["data"] if msg["role"] == "assistant" and msg.get("groundedness") is not None]
+    eval_msgs = [msg for msg in history if msg.get("groundedness") is not None]
 
     if not eval_msgs:
         return PerformanceMetricsResponse(

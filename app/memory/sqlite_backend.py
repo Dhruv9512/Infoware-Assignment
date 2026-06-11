@@ -43,8 +43,8 @@ class SQLAlchemyMemoryStore(BaseMemoryStore):
             {
                 "id": msg.id,
                 "session_id": msg.session_id,
-                "role": msg.role,
-                "content": msg.content,
+                "user_message": msg.user_message,     
+                "agent_message": msg.agent_message,  
                 "tools_called": json.loads(msg.tools_called),
                 "created_at": msg.created_at,
                 "groundedness": msg.groundedness,
@@ -69,24 +69,11 @@ class SQLAlchemyMemoryStore(BaseMemoryStore):
     # -------------------------------------------------------------------------
 
     async def save_message_turn(
-        self,
-        user_id: str,
-        session_id: str,
-        role: str,
-        content: Any,
-        tools_called: List[str],
-        catalog_context: str,
-        evaluation: Dict[str, Any],
+       self, user_id: str, session_id: str, user_message: str,
+        agent_message: str, tools_called: List[str], 
+        catalog_context: str, evaluation: Dict[str, Any],
     ) -> None:
-        # Normalise content to a plain string
-        if isinstance(content, list):
-            content = " ".join(
-                block["text"] if isinstance(block, dict) and "text" in block else str(block)
-                for block in content
-            ) or str(content)
-        elif not isinstance(content, str):
-            content = str(content)
-
+      
         # Ensure a user profile record exists before inserting the message
         if await self.get_user_summary(user_id) is None:
             self.session.add(UserMemorySummaryTable(user_id=user_id, summary=""))
@@ -96,8 +83,8 @@ class SQLAlchemyMemoryStore(BaseMemoryStore):
             MessageTable(
                 user_id=user_id,
                 session_id=session_id,
-                role=role,
-                content=content,
+                user_message=user_message,
+                agent_message=agent_message,
                 tools_called=json.dumps(tools_called),
                 catalog_context=catalog_context,
                 groundedness=evaluation.get("groundedness"),

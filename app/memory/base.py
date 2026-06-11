@@ -34,8 +34,8 @@ class BaseMemoryStore(ABC):
         self, 
         user_id: str, 
         session_id: str, 
-        role: str, 
-        content: str,
+        user_message: str,
+        agent_message: str,
         tools_called: List[str],
         catalog_context: str,
         evaluation: Dict[str, Any]
