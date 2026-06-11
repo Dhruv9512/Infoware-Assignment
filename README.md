@@ -13,28 +13,31 @@ A Persistent Sales Assistant Agent featuring cross-session memory, dynamic tool 
 Below is the request lifecycle illustrating how a user message flows from the API through the LangGraph agent, tool execution, and the evaluation layer.
 
 ```mermaid
-sequenceDiagram
-    participant Client
-    participant API as FastAPI Router
-    participant Agent as LangGraph Sales Agent
-    participant Tools as Tools (Catalog/Memory)
-    participant Eval as Evaluation Service
-    participant DB as SQLite / Persistence
-
-    Client->>API: POST /chat/{user_id}
-    API->>DB: Fetch past conversation & user summary
-    API->>Agent: Invoke with History + New Message
-    loop Agent Reasoning
-        Agent->>Tools: Call search_catalog or get_user_memory
-        Tools-->>Agent: Return tool execution results
-    Agent->>Agent: Generate final response
-    end
-    Agent-->>API: Return Markdown Response
-    API->>Eval: Trigger structured self-eval (temp=0.0)
-    Eval-->>API: Return FeedbackLoopBlock (scores)
-    API->>DB: (Background) Persist turn & compress summary
-    API-->>Client: Return JSON (Response + Eval + Tools)
-
+graph TD
+    A[User Request] --> B[API Router]
+    B --> C[ChatService]
+    C --> D{Session ID Provided?}
+    
+    D -->|Yes| E[Hydrate Short-Term History]
+    D -->|No| F[Generate New Session UUID]
+    
+    E --> G[LangGraph Agent State]
+    F --> G
+    
+    G --> H{Agent Execution}
+    H <-->|Tool Call| I[Catalog Search Tool]
+    H <-->|Tool Call| J[User Memory Tool]
+    H <-->|Tool Call| Q[Flag for Human Tool]
+    
+    H --> K[Agent Response]
+    K --> L[LLM Evaluator Service]
+    
+    L --> M[Return Response + Eval to User]
+    
+    M -.-> N((Background Task))
+    N -.-> O[Save Interaction to DB]
+    N -.-> P[Compress & Update User Summary]
+    N -.-> R[Log Flagged Responses for Human Review]
 ```
 
 ---
